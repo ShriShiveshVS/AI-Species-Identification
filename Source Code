@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Species Identifier</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            text-align: center;
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #6e8efb, #a777e3);
+            color: white;
+        }
+        .container {
+            background: white;
+            color: black;
+            max-width: 500px;
+            margin: auto;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.2);
+        }
+        .label-upload, button {
+            display: block;
+            width: 100%;
+            padding: 12px;
+            font-size: 18px;
+            font-weight: bold;
+            background-color: #ff5722;
+            color: white;
+            border: none;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: 0.3s;
+            margin-top: 10px;
+        }
+        .label-upload:hover, button:hover {
+            background-color: #e64a19;
+        }
+        #preview {
+            display: none;
+            max-width: 100%;
+            margin-top: 20px;
+            border-radius: 10px;
+            box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.3);
+        }
+        #webcam-container {
+            margin-top: 20px;
+        }
+        #result {
+            font-size: 18px;
+            font-weight: bold;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>AI Species Identifier</h1>
+    <div class="container">
+        <input type="file" id="imageUpload" accept="image/*" style="display:none;">
+        <label for="imageUpload" class="label-upload">Upload Image</label>
+        <img id="preview">
+        <button onclick="predictImage()">Identify from Image</button>
+        <button onclick="initWebcam()">Start Webcam</button>
+        <div id="webcam-container"></div>
+        <div id="label-container"></div>
+        <p id="result"></p>
+    </div>
+
+    <script>
+        const modelURL = "https://teachablemachine.withgoogle.com/models/rEszq9DXf/model.json";
+        const metadataURL = "https://teachablemachine.withgoogle.com/models/rEszq9DXf/metadata.json";
+        let model, webcam, labelContainer, maxPredictions;
+
+        async function loadModel() {
+            model = await tmImage.load(modelURL, metadataURL);
+            maxPredictions = model.getTotalClasses();
+            console.log("Model Loaded Successfully!");
+        }
+        loadModel();
+
+        function previewImage(event) {
+            let img = document.getElementById("preview");
+            img.src = URL.createObjectURL(event.target.files[0]);
+            img.style.display = "block";
+        }
+        document.getElementById("imageUpload").addEventListener("change", previewImage);
+
+        async function predictImage() {
+            let fileInput = document.getElementById("imageUpload");
+            if (fileInput.files.length === 0) {
+                alert("Please upload an image first.");
+                return;
+            }
+            let img = document.createElement("img");
+            img.src = URL.createObjectURL(fileInput.files[0]);
+            img.width = 224;
+            img.height = 224;
+            img.onload = async () => {
+                const prediction = await model.predict(img);
+                displayResults(prediction);
+            };
+        }
+
+        async function initWebcam() {
+            const flip = true;
+            webcam = new tmImage.Webcam(200, 200, flip);
+            await webcam.setup();
+            await webcam.play();
+            window.requestAnimationFrame(loop);
+            document.getElementById("webcam-container").appendChild(webcam.canvas);
+            labelContainer = document.getElementById("label-container");
+            labelContainer.innerHTML = "";
+            for (let i = 0; i < maxPredictions; i++) {
+                labelContainer.appendChild(document.createElement("div"));
+            }
+        }
+
+        async function loop() {
+            webcam.update();
+            await predictWebcam();
+            window.requestAnimationFrame(loop);
+        }
+
+        async function predictWebcam() {
+            const prediction = await model.predict(webcam.canvas);
+            displayResults(prediction);
+        }
+
+        function displayResults(prediction) {
+            let resultText = "Predictions:<br>";
+            prediction.forEach(p => {
+                resultText += `${p.className}: ${Math.round(p.probability * 100)}%<br>`;
+            });
+            document.getElementById("result").innerHTML = resultText;
+        }
+    </script>
+</body>
+</html>
